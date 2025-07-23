@@ -30,8 +30,6 @@ werkzeug_logger.setLevel(logging.ERROR)
 
 
 # --- Configuration Loading ---
-# For production, it is strongly recommended to load secrets from environment
-# variables rather than a plain text file.
 config = configparser.ConfigParser()
 config.read('config.ini')
 
@@ -52,8 +50,6 @@ PUSHOVER_API_TOKEN = config['NOTIFICATIONS']['PUSHOVER_API_TOKEN']
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
-# It is critical to set a secret key for session management and other security features.
-# For production, this should be a long, random string loaded from an environment variable.
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'dev-insecure-fallback-key')
 
 
