@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #111827; /* dark-gray-900 */
+            color: #d1d5db; /* dark-gray-300 */
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://rsms.me/inter/inter.css');
+        .card {
+            background-color: #1f2937; /* dark-gray-800 */
+            border: 1px solid #374151; /* dark-gray-700 */
+        }
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 5px 1px;
+        }
+        .status-running { background-color: #22c55e; box-shadow-color: #22c55e; } /* green-500 */
+        .status-stopped { background-color: #ef4444; box-shadow-color: #ef4444; } /* red-500 */
+        .status-idle { background-color: #eab308; box-shadow-color: #eab308; } /* yellow-500 */
+        .log-box {
+            background-color: #000;
+            color: #a5f3fc; /* cyan-200 */
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #374151;
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white">Automation Service Dashboard</h1>
+            <p class="text-gray-400">Live status monitoring for background services.</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- JDownloader Card -->
+            <div class="card p-6 rounded-lg shadow-lg">
+                <h2 class="text-xl font-semibold text-white mb-4">JDownloader Watcher</h2>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Status:</span>
+                        <div class="flex items-center gap-2">
+                            <span id="jd-status-dot" class="status-dot status-stopped"></span>
+                            <span id="jd-status-text" class="font-mono text-white">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">PID:</span>
+                        <span id="jd-pid" class="font-mono text-white">N/A</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Last RD Check:</span>
+                        <span id="jd-last-check" class="font-mono text-white">N/A</span>
+                    </div>
+                </div>
+                <div class="mt-6 flex space-x-4">
+                    <button onclick="startJdownloader()" class="btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Start</button>
+                    <button onclick="stopJdownloader()" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Stop</button>
+                </div>
+            </div>
+
+            <!-- Movie Processor Card -->
+            <div class="card p-6 rounded-lg shadow-lg">
+                <h2 class="text-xl font-semibold text-white mb-4">Movie Organizer</h2>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Status:</span>
+                         <div class="flex items-center gap-2">
+                            <span id="movie-status-dot" class="status-dot status-idle"></span>
+                            <span id="movie-status-text" class="font-mono text-white">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Last Run:</span>
+                        <span id="movie-last-run" class="font-mono text-white">N/A</span>
+                    </div>
+                     <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Last Run Stats:</span>
+                        <span id="movie-last-run-stats" class="font-mono text-white">N/A</span>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <button onclick="processMovies()" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Run Movie Processor</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Viewer Card -->
+        <div class="card p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold text-white mb-4">Application Logs</h2>
+            <div id="log-output" class="log-box p-4 rounded-md">Loading logs...</div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white py-2 px-4 rounded-lg shadow-lg transition-opacity duration-300 opacity-0">
+            <p id="toast-message"></p>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin;
+
+        // --- UI Update Functions ---
+        function updateStatus() {
+            fetch(`${API_BASE_URL}/status`)
+                .then(response => response.json())
+                .then(data => {
+                    // JDownloader Status
+                    const jdStatusDot = document.getElementById('jd-status-dot');
+                    const jdStatusText = document.getElementById('jd-status-text');
+                    const jdPid = document.getElementById('jd-pid');
+                    const jdLastCheck = document.getElementById('jd-last-check');
+
+                    jdStatusDot.className = 'status-dot'; // Reset classes
+                    if (data.jdownloader.state === 'Running') {
+                        jdStatusDot.classList.add('status-running');
+                        jdStatusText.textContent = 'Running';
+                        jdPid.textContent = data.jdownloader.pid || 'N/A';
+                        const lastCheckTime = data.jdownloader.last_check ? new Date(data.jdownloader.last_check).toLocaleString() : 'N/A';
+                        jdLastCheck.textContent = lastCheckTime;
+                    } else {
+                        jdStatusDot.classList.add('status-stopped');
+                        jdStatusText.textContent = 'Stopped';
+                        jdPid.textContent = 'N/A';
+                        jdLastCheck.textContent = 'N/A';
+                    }
+
+                    // Movie Organizer Status
+                    const movieStatusDot = document.getElementById('movie-status-dot');
+                    const movieStatusText = document.getElementById('movie-status-text');
+                    const movieLastRun = document.getElementById('movie-last-run');
+                    const movieLastRunStats = document.getElementById('movie-last-run-stats');
+
+                    movieStatusDot.className = 'status-dot'; // Reset classes
+                    if (data.movie_organizer.state === 'Running') {
+                        movieStatusDot.classList.add('status-running');
+                        movieStatusText.textContent = 'Running';
+                    } else {
+                        movieStatusDot.classList.add('status-idle');
+                        movieStatusText.textContent = 'Idle';
+                    }
+
+                    if (data.movie_organizer.last_run && data.movie_organizer.last_run.completed_at) {
+                        movieLastRun.textContent = new Date(data.movie_organizer.last_run.completed_at).toLocaleString();
+                        const summary = data.movie_organizer.last_run.summary;
+                        if (summary.error) {
+                             movieLastRunStats.textContent = `Error: ${summary.error}`;
+                        } else {
+                             movieLastRunStats.textContent = `Processed: ${summary.processed}, Skipped: ${summary.skipped}`;
+                        }
+                    } else {
+                        movieLastRun.textContent = 'Never';
+                        movieLastRunStats.textContent = 'N/A';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching status:', error);
+                    showToast('Could not connect to backend to fetch status.');
+                    document.getElementById('jd-status-text').textContent = 'Error';
+                    document.getElementById('movie-status-text').textContent = 'Error';
+                });
+        }
+
+        function updateLogs() {
+            fetch(`${API_BASE_URL}/logs`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const logOutput = document.getElementById('log-output');
+                    logOutput.textContent = data.logs || 'No logs available.';
+                    // Auto-scroll to the bottom
+                    logOutput.scrollTop = logOutput.scrollHeight;
+                })
+                .catch(error => {
+                    console.error('Error fetching logs:', error);
+                    document.getElementById('log-output').textContent = 'Error loading logs. Is the backend running?';
+                });
+        }
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        // --- Action Functions ---
+        function postAction(endpoint, successMessage) {
+            showToast(`Sending command: ${successMessage.split('.')[0]}...`);
+            fetch(`${API_BASE_URL}${endpoint}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data.status);
+                    showToast(data.status || successMessage);
+                    // Refresh status immediately after an action
+                    setTimeout(updateStatus, 500);
+                })
+                .catch(error => {
+                    console.error(`Error with ${endpoint}:`, error);
+                    showToast(`Error performing action. See console.`);
+                });
+        }
+
+        function startJdownloader() {
+            postAction('/start_jdownloader', 'JDownloader watcher started.');
+        }
+
+        function stopJdownloader() {
+            postAction('/stop_jdownloader', 'JDownloader watcher stopped.');
+        }
+
+        function processMovies() {
+            postAction('/process_movies', 'Movie processing initiated.');
+        }
+
+        // --- Initial Load and Interval ---
+        window.onload = function() {
+            updateStatus();
+            updateLogs();
+            setInterval(updateStatus, 5000); // Refresh status every 5 seconds
+            setInterval(updateLogs, 10000); // Refresh logs every 10 seconds
+        };
+    </script>
+</body>
+</html>
