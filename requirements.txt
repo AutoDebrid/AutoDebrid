@@ -1,0 +1,6 @@
+flask
+requests
+werkzeug
+python-dotenv
+gunicorn
+Flask-WTF

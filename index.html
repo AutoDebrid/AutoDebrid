@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Service Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://rsms.me/inter/inter.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #111827;
+            color: #d1d5db;
+            font-family: 'Inter', sans-serif;
+        }
+        .card { background-color: #1f2937; border: 1px solid #374151; }
+        .status-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; box-shadow: 0 0 5px 1px; }
+        .status-running { background-color: #22c55e; box-shadow-color: #22c55e; }
+        .status-stopped { background-color: #ef4444; box-shadow-color: #ef4444; }
+        .status-idle { background-color: #eab308; box-shadow-color: #eab308; }
+        .log-box { background-color: #000; color: #a5f3fc; font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; border: 1px solid #374151; }
+        .btn { transition: all 0.2s ease-in-out; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .btn:disabled { background-color: #4b5563; cursor: not-allowed; }
+        
+        /* Page switching styles */
+        .page {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        .page.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .nav-link.active {
+            color: #ffffff;
+            background-color: #374151;
+        }
+        /* Input field styling */
+        .form-input {
+             margin-top: 0.25rem;
+             display: block;
+             width: 100%;
+             padding: 0.5rem 0.75rem;
+             background-color: #374151; /* Darker input background */
+             border: 1px solid #4b5563; /* Slightly lighter border */
+             border-radius: 0.375rem;
+             box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+             color: #d1d5db;
+        }
+        .form-input::placeholder {
+            color: #6b7280;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-white">Automation Service Dashboard</h1>
+            <p class="text-gray-400 mb-4">Live status monitoring and configuration for background services.</p>
+            <!-- Navigation -->
+            <nav class="flex space-x-2 bg-gray-800 p-2 rounded-lg">
+                <button onclick="showPage('dashboard')" class="nav-link text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" data-page="dashboard">Dashboard</button>
+                <button onclick="showPage('settings')" class="nav-link text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" data-page="settings">Settings</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Dashboard Page -->
+            <div id="dashboard-page" class="page">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="card p-6 rounded-lg shadow-lg">
+                        <h2 class="text-xl font-semibold text-white mb-4">JDownloader Watcher</h2>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Status:</span><div class="flex items-center gap-2"><span id="jd-status-dot" class="status-dot status-stopped"></span><span id="jd-status-text" class="font-mono text-white">Loading...</span></div></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">PID:</span><span id="jd-pid" class="font-mono text-white">N/A</span></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Last RD Check:</span><span id="jd-last-check" class="font-mono text-white">N/A</span></div>
+                        </div>
+                        <div class="mt-6 flex space-x-4">
+                            <button id="btn-start-jd" onclick="startJdownloader()" class="btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Start</button>
+                            <button id="btn-stop-jd" onclick="stopJdownloader()" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop</button>
+                        </div>
+                    </div>
+
+                    <div class="card p-6 rounded-lg shadow-lg">
+                        <h2 class="text-xl font-semibold text-white mb-4">Movie Organizer</h2>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Status:</span><div class="flex items-center gap-2"><span id="movie-status-dot" class="status-dot status-idle"></span><span id="movie-status-text" class="font-mono text-white">Loading...</span></div></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Last Run:</span><span id="movie-last-run" class="font-mono text-white">N/A</span></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Last Run Stats:</span><span id="movie-last-run-stats" class="font-mono text-white">N/A</span></div>
+                        </div>
+                        <div class="mt-6">
+                            <button id="btn-run-movies" onclick="processMovies()" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Run Movie Processor</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-6 rounded-lg shadow-lg">
+                    <h2 class="text-xl font-semibold text-white mb-4">Application Logs</h2>
+                    <div id="log-output" class="log-box p-4 rounded-md">Authenticating... Please enter your API Key.</div>
+                </div>
+            </div>
+
+            <!-- Settings Page -->
+            <div id="settings-page" class="page">
+                <div class="max-w-2xl mx-auto">
+                    <div class="card p-8 rounded-lg shadow-lg">
+                        <h1 class="text-2xl font-bold text-white mb-2">Application Settings</h1>
+                        <p class="text-gray-400 mb-6">Configure all application secrets, paths, and settings here. The current values will be loaded from the server.</p>
+                        
+                        <form id="settings-form">
+                            <div class="space-y-8">
+                                <!-- API Keys & Secrets Section -->
+                                <div>
+                                    <h2 class="text-lg font-semibold text-white border-b border-gray-600 pb-2 mb-4">API Keys & Secrets</h2>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                        <div>
+                                            <label for="flask-secret-key" class="block text-sm font-medium text-gray-300">Flask Secret Key</label>
+                                            <input type="password" id="flask-secret-key" name="FLASK_SECRET_KEY" class="form-input" placeholder="Long, random string">
+                                        </div>
+                                        <div>
+                                            <label for="internal-api-key" class="block text-sm font-medium text-gray-300">Internal API Key</label>
+                                            <input type="password" id="internal-api-key" name="INTERNAL_API_KEY" class="form-input" placeholder="Secure dashboard key">
+                                        </div>
+                                        <div>
+                                            <label for="real-debrid-key" class="block text-sm font-medium text-gray-300">Real-Debrid API Key</label>
+                                            <input type="password" id="real-debrid-key" name="REAL_DEBRID_API_KEY" class="form-input" placeholder="Your Real-Debrid key">
+                                        </div>
+                                        <div>
+                                            <label for="radarr-api-key" class="block text-sm font-medium text-gray-300">Radarr API Key</label>
+                                            <input type="password" id="radarr-api-key" name="RADARR_API_KEY" class="form-input" placeholder="Your Radarr API key">
+                                        </div>
+                                        <div>
+                                            <label for="pushover-user-key" class="block text-sm font-medium text-gray-300">Pushover User Key</label>
+                                            <input type="text" id="pushover-user-key" name="PUSHOVER_USER_KEY" class="form-input" placeholder="Your Pushover user key">
+                                        </div>
+                                        <div>
+                                            <label for="pushover-api-token" class="block text-sm font-medium text-gray-300">Pushover API Token</label>
+                                            <input type="text" id="pushover-api-token" name="PUSHOVER_API_TOKEN" class="form-input" placeholder="Your Pushover app token">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Paths Section -->
+                                <div>
+                                    <h2 class="text-lg font-semibold text-white border-b border-gray-600 pb-2 mb-4">Paths</h2>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label for="jdownloader-watch-folder" class="block text-sm font-medium text-gray-300">JDownloader Watch Folder</label>
+                                            <input type="text" id="jdownloader-watch-folder" name="JDOWNLOADER_WATCH_FOLDER" class="form-input" placeholder="/path/to/jdownloader/folderwatch">
+                                        </div>
+                                        <div>
+                                            <label for="source-folder" class="block text-sm font-medium text-gray-300">Source Folder (Movies)</label>
+                                            <input type="text" id="source-folder" name="SOURCE_FOLDER" class="form-input" placeholder="/path/to/your/source_movies">
+                                        </div>
+                                        <div>
+                                            <label for="local-move-path" class="block text-sm font-medium text-gray-300">Local Move Path</label>
+                                            <input type="text" id="local-move-path" name="LOCAL_MOVE_PATH" class="form-input" placeholder="/path/where/radarr/expects/movies">
+                                        </div>
+                                        <div>
+                                            <label for="radarr-root" class="block text-sm font-medium text-gray-300">Radarr Root Folder</label>
+                                            <input type="text" id="radarr-root" name="RADARR_ROOT" class="form-input" placeholder="/path/where/radarr/expects/movies">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Endpoints Section -->
+                                <div>
+                                    <h2 class="text-lg font-semibold text-white border-b border-gray-600 pb-2 mb-4">Endpoints</h2>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label for="radarr-url" class="block text-sm font-medium text-gray-300">Radarr URL</label>
+                                            <input type="text" id="radarr-url" name="RADARR_URL" class="form-input" placeholder="http://your-radarr-ip:7878">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Settings Section -->
+                                <div>
+                                    <h2 class="text-lg font-semibold text-white border-b border-gray-600 pb-2 mb-4">Settings</h2>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label for="check-interval" class="block text-sm font-medium text-gray-300">Check Interval (Seconds)</label>
+                                            <input type="number" id="check-interval" name="CHECK_INTERVAL_SECONDS" class="form-input" placeholder="60">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Save Button -->
+                            <div class="mt-8 flex justify-end">
+                                <button type="submit" class="btn inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                    Save Settings
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Notification and Output Section -->
+                    <div id="output-section" class="mt-8 card p-8 rounded-lg shadow-lg" style="display: none;">
+                        <div id="notification-box" class="mb-4 p-4 rounded-md bg-green-900/50 text-green-300 border border-green-700">
+                            <h3 class="font-bold">Settings Saved!</h3>
+                            <p>For changes to take effect in a real application, you would need to restart the server.</p>
+                        </div>
+                        <h2 class="text-lg font-semibold text-white">Generated `.env` Content</h2>
+                        <p class="text-sm text-gray-400 mb-4">In a real application, this content would be written to the `.env` file on the server.</p>
+                        <div class="bg-black text-white rounded-md p-4 font-mono text-sm overflow-x-auto border border-gray-700">
+                            <pre><code id="env-output"># Your .env file content will appear here...</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white py-2 px-4 rounded-lg shadow-lg transition-opacity duration-300 opacity-0">
+            <p id="toast-message"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- Globals for Security & State ---
+        let internalApiKey = null;
+        let csrfToken = null;
+        const actionButtons = ['btn-start-jd', 'btn-stop-jd', 'btn-run-movies'];
+
+        // --- Page Navigation Logic ---
+        const pages = document.querySelectorAll('.page');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        function showPage(pageId) {
+            pages.forEach(page => page.classList.remove('active'));
+            const targetPage = document.getElementById(`${pageId}-page`);
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.dataset.page === pageId) {
+                    link.classList.add('active');
+                }
+            });
+            if (pageId === 'settings') {
+                loadCurrentSettings();
+            }
+        }
+
+        // --- UI Update Functions (Dashboard) ---
+        function updateStatus() {
+            if (!internalApiKey) return;
+            fetch(`/status`)
+                .then(response => response.json())
+                .then(data => {
+                    // JDownloader Status
+                    const jdStatusDot = document.getElementById('jd-status-dot');
+                    jdStatusDot.className = 'status-dot'; // Reset classes
+                    if (data.jdownloader.state === 'Running') {
+                        jdStatusDot.classList.add('status-running');
+                        document.getElementById('jd-status-text').textContent = 'Running';
+                        document.getElementById('jd-pid').textContent = data.jdownloader.pid || 'N/A';
+                        const lastCheckTime = data.jdownloader.last_check ? new Date(data.jdownloader.last_check).toLocaleString() : 'N/A';
+                        document.getElementById('jd-last-check').textContent = lastCheckTime;
+                    } else {
+                        jdStatusDot.classList.add('status-stopped');
+                        document.getElementById('jd-status-text').textContent = 'Stopped';
+                        document.getElementById('jd-pid').textContent = 'N/A';
+                        document.getElementById('jd-last-check').textContent = 'N/A';
+                    }
+
+                    // Movie Organizer Status
+                    const movieStatusDot = document.getElementById('movie-status-dot');
+                    movieStatusDot.className = 'status-dot'; // Reset classes
+                    if (data.movie_organizer.state === 'Running') {
+                        movieStatusDot.classList.add('status-running');
+                        document.getElementById('movie-status-text').textContent = 'Running';
+                        document.getElementById('btn-run-movies').disabled = true;
+                    } else {
+                        movieStatusDot.classList.add('status-idle');
+                        document.getElementById('movie-status-text').textContent = 'Idle';
+                        // Only enable if authenticated
+                        if (internalApiKey) document.getElementById('btn-run-movies').disabled = false;
+                    }
+
+                    if (data.movie_organizer.last_run && data.movie_organizer.last_run.completed_at) {
+                        document.getElementById('movie-last-run').textContent = new Date(data.movie_organizer.last_run.completed_at).toLocaleString();
+                        const summary = data.movie_organizer.last_run.summary;
+                        document.getElementById('movie-last-run-stats').textContent = summary.error ? `Error: ${summary.error}` : `Processed: ${summary.processed}, Skipped: ${summary.skipped}`;
+                    } else {
+                        document.getElementById('movie-last-run').textContent = 'Never';
+                        document.getElementById('movie-last-run-stats').textContent = 'N/A';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching status:', error);
+                    showToast('Could not fetch status.');
+                });
+        }
+
+        function updateLogs() {
+            if (!internalApiKey) return;
+            fetch(`/logs`)
+                .then(response => response.ok ? response.json() : Promise.reject(response))
+                .then(data => {
+                    const logOutput = document.getElementById('log-output');
+                    if (logOutput.textContent !== data.logs) {
+                        logOutput.textContent = data.logs || 'No logs available.';
+                        logOutput.scrollTop = logOutput.scrollHeight;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching logs:', error);
+                    document.getElementById('log-output').textContent = 'Error loading logs.';
+                });
+        }
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 3000);
+        }
+
+        // --- Action Functions (Dashboard & Settings) ---
+        function postAction(endpoint, successMessage, body = {}) {
+            if (!internalApiKey) {
+                showToast("API Key not set. Please refresh and enter your key.");
+                return;
+            }
+            showToast(`Sending command...`);
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                    'X-Api-Key': internalApiKey
+                },
+                body: JSON.stringify(body)
+            })
+            .then(response => {
+                if (response.status === 401) {
+                    showToast("Authentication Failed! Incorrect API Key.");
+                    internalApiKey = null; // Force re-authentication on next action
+                }
+                if (!response.ok) {
+                    // Try to get a meaningful error from the JSON response
+                    return response.json().then(err => { throw new Error(err.status || 'An unknown error occurred.'); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                showToast(data.status || successMessage);
+                if(endpoint.includes('settings')) return; // Don't refresh status for settings save
+                setTimeout(updateStatus, 500); // Refresh status after an action
+            })
+            .catch(error => {
+                console.error(`Error with ${endpoint}:`, error);
+                showToast(`Error: ${error.message}`);
+            });
+        }
+
+        function startJdownloader() { postAction('/start_jdownloader', 'JDownloader watcher started.'); }
+        function stopJdownloader() { postAction('/stop_jdownloader', 'JDownloader watcher stopped.'); }
+        function processMovies() { postAction('/process_movies', 'Movie processing initiated.'); }
+
+        // --- Settings Page Logic ---
+        const settingsForm = document.getElementById('settings-form');
+        const envOutput = document.getElementById('env-output');
+        const outputSection = document.getElementById('output-section');
+        
+        function loadCurrentSettings() {
+            if (!internalApiKey) {
+                showToast("API Key required to load settings.");
+                return;
+            }
+            fetch('/api/get-settings', {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Api-Key': internalApiKey
+                }
+            })
+            .then(response => {
+                if (!response.ok) { throw new Error('Failed to load settings from server.'); }
+                return response.json();
+            })
+            .then(settings => {
+                console.log("Loaded settings from server:", settings);
+                for (const key in settings) {
+                    const input = settingsForm.elements[key];
+                    if (input) {
+                        input.value = settings[key] || '';
+                    }
+                }
+                showToast("Current settings loaded.");
+            })
+            .catch(error => {
+                console.error('Error loading settings:', error);
+                showToast(error.message);
+            });
+        }
+
+        settingsForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(settingsForm);
+            const settingsData = Object.fromEntries(formData.entries());
+            
+            // Generate .env content for preview
+            let envContent = `# This file was generated on ${new Date().toISOString()}\n\n`;
+            for (const [key, value] of Object.entries(settingsData)) {
+                // Do not add empty values to the preview, but send them to the server
+                // so they can be explicitly cleared if needed.
+                if (value) { 
+                    envContent += `${key}="${value}"\n`;
+                }
+            }
+            envOutput.textContent = envContent;
+            outputSection.style.display = 'block';
+            
+            // Send the settings to the backend to be saved
+            postAction('/api/save-settings', 'Settings saved. Please RESTART the server.', settingsData);
+        });
+
+
+        // --- Initial Load and Authentication ---
+        window.onload = function() {
+            csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            
+            // Set initial page
+            showPage('dashboard');
+
+            // Try to get key from session storage first
+            internalApiKey = sessionStorage.getItem('dashboardApiKey');
+
+            if (!internalApiKey) {
+                 internalApiKey = prompt("Please enter your Internal API Key for this session:");
+                 if (internalApiKey) {
+                     sessionStorage.setItem('dashboardApiKey', internalApiKey); // Save for the session
+                 }
+            }
+
+            if (internalApiKey) {
+                document.getElementById('log-output').textContent = 'Authenticated. Loading logs...';
+                actionButtons.forEach(id => document.getElementById(id).disabled = false);
+                updateStatus();
+                updateLogs();
+                setInterval(updateStatus, 5000);
+                setInterval(updateLogs, 10000);
+            } else {
+                 document.getElementById('log-output').textContent = 'Authentication cancelled. Refresh the page to try again.';
+            }
+        };
+    </script>
+</body>
+</html>
