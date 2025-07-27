@@ -47,7 +47,7 @@ Follow these steps to get AutoDebrid up and running on your machine.
 Open a terminal and run the following commands to update your system, install `pip` and `git`, and clone the application repository.
 ```bash
 sudo apt update && sudo apt install python3-pip git -y
-git clone [https://github.com/naughteric/AutoDebrid.git](https://github.com/your_username/AutoDebrid.git)
+git clone [https://github.com/AutoDebrid/AutoDebrid.git]
 cd AutoDebrid
 ````
 
