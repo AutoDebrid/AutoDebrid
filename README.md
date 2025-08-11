@@ -92,9 +92,7 @@ This is the most common issue, especially on systems like Unraid or when using D
     sudo chown -R 99:100 /path/to/your/media/
     sudo chmod -R 775 /path/to/your/media/
     ```
-    Sonarr Permissions
     [![Sonarr Permissions](https://i.postimg.cc/fTwPgy1H/sonpermissions.png)](https://postimg.cc/Hjh3rYY5)
-    Radarr Permissions
     [![Radarr Permissions](https://i.postimg.cc/mkdynLFq/radpermissions.png)](https://postimg.cc/RJHt6zdQ)
 
 ### Radarr/Sonarr Errors
