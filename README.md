@@ -2,7 +2,7 @@
 
 A web-based dashboard to automate your media workflow, bridging the gap between Real-Debrid, JDownloader, Radarr, and Sonarr. This application monitors your services, processes completed downloads, and organizes your media library automatically.
 
-![Dashboard Screenshot](https://postimg.cc/yDqBBC2X) <!-- Replace with a URL to a screenshot of your dashboard -->
+[![Dashboard Screenshot](https://i.postimg.cc/6pqQr90S/dashboard.png)](https://postimg.cc/yDqBBC2X)
 
 ---
 
@@ -93,9 +93,9 @@ This is the most common issue, especially on systems like Unraid or when using D
     sudo chmod -R 775 /path/to/your/media/
     ```
     Sonarr Permissions
-    (https://postimg.cc/Hjh3rYY5)
+    [![Sonarr Permissions](https://i.postimg.cc/fTwPgy1H/sonpermissions.png)](https://postimg.cc/Hjh3rYY5)
     Radarr Permissions
-    (https://postimg.cc/RJHt6zdQ)
+    [![Radarr Permissions](https://i.postimg.cc/mkdynLFq/radpermissions.png)](https://postimg.cc/RJHt6zdQ)
 
 ### Radarr/Sonarr Errors
 
