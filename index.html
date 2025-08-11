@@ -77,7 +77,7 @@
         <main>
             <!-- Dashboard Page -->
             <div id="dashboard-page" class="page">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                     <div class="card p-6 rounded-lg shadow-lg">
                         <h2 class="text-xl font-semibold text-white mb-4">JDownloader Watcher</h2>
                         <div class="space-y-3">
@@ -94,12 +94,26 @@
                     <div class="card p-6 rounded-lg shadow-lg">
                         <h2 class="text-xl font-semibold text-white mb-4">Movie Organizer</h2>
                         <div class="space-y-3">
-                            <div class="flex items-center justify-between"><span class="text-gray-400">Status:</span><div class="flex items-center gap-2"><span id="movie-status-dot" class="status-dot status-idle"></span><span id="movie-status-text" class="font-mono text-white">Loading...</span></div></div>
-                            <div class="flex items-center justify-between"><span class="text-gray-400">Last Run:</span><span id="movie-last-run" class="font-mono text-white">N/A</span></div>
-                            <div class="flex items-center justify-between"><span class="text-gray-400">Last Run Stats:</span><span id="movie-last-run-stats" class="font-mono text-white">N/A</span></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Status:</span><div class="flex items-center gap-2"><span id="movie-status-dot" class="status-dot status-stopped"></span><span id="movie-status-text" class="font-mono text-white">Loading...</span></div></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">PID:</span><span id="movie-pid" class="font-mono text-white">N/A</span></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Last Scan:</span><span id="movie-last-scan" class="font-mono text-white">N/A</span></div>
                         </div>
-                        <div class="mt-6">
-                            <button id="btn-run-movies" onclick="processMovies()" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Run Movie Processor</button>
+                        <div class="mt-6 flex space-x-4">
+                            <button id="btn-start-mo" onclick="startMovieOrganizer()" class="btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Start</button>
+                            <button id="btn-stop-mo" onclick="stopMovieOrganizer()" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop</button>
+                        </div>
+                    </div>
+
+                    <div class="card p-6 rounded-lg shadow-lg">
+                        <h2 class="text-xl font-semibold text-white mb-4">TV Show Organizer</h2>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Status:</span><div class="flex items-center gap-2"><span id="tv-status-dot" class="status-dot status-stopped"></span><span id="tv-status-text" class="font-mono text-white">Loading...</span></div></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">PID:</span><span id="tv-pid" class="font-mono text-white">N/A</span></div>
+                            <div class="flex items-center justify-between"><span class="text-gray-400">Last Scan:</span><span id="tv-last-scan" class="font-mono text-white">N/A</span></div>
+                        </div>
+                        <div class="mt-6 flex space-x-4">
+                            <button id="btn-start-to" onclick="startTvOrganizer()" class="btn w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Start</button>
+                            <button id="btn-stop-to" onclick="stopTvOrganizer()" class="btn w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg" disabled>Stop</button>
                         </div>
                     </div>
                 </div>
@@ -136,10 +150,6 @@
                                             <input type="password" id="real-debrid-key" name="REAL_DEBRID_API_KEY" class="form-input" placeholder="Your Real-Debrid key">
                                         </div>
                                         <div>
-                                            <label for="radarr-api-key" class="block text-sm font-medium text-gray-300">Radarr API Key</label>
-                                            <input type="password" id="radarr-api-key" name="RADARR_API_KEY" class="form-input" placeholder="Your Radarr API key">
-                                        </div>
-                                        <div>
                                             <label for="pushover-user-key" class="block text-sm font-medium text-gray-300">Pushover User Key</label>
                                             <input type="text" id="pushover-user-key" name="PUSHOVER_USER_KEY" class="form-input" placeholder="Your Pushover user key">
                                         </div>
@@ -159,16 +169,28 @@
                                             <input type="text" id="jdownloader-watch-folder" name="JDOWNLOADER_WATCH_FOLDER" class="form-input" placeholder="/path/to/jdownloader/folderwatch">
                                         </div>
                                         <div>
-                                            <label for="source-folder" class="block text-sm font-medium text-gray-300">Source Folder (Movies)</label>
-                                            <input type="text" id="source-folder" name="SOURCE_FOLDER" class="form-input" placeholder="/path/to/your/source_movies">
+                                            <label for="source-folder" class="block text-sm font-medium text-gray-300">Source Folder (Downloads)</label>
+                                            <input type="text" id="source-folder" name="SOURCE_FOLDER" class="form-input" placeholder="/path/to/your/source_downloads">
                                         </div>
                                         <div>
-                                            <label for="local-move-path" class="block text-sm font-medium text-gray-300">Local Move Path</label>
-                                            <input type="text" id="local-move-path" name="LOCAL_MOVE_PATH" class="form-input" placeholder="/path/where/radarr/expects/movies">
+                                            <label for="completed-folder" class="block text-sm font-medium text-gray-300">Completed Downloads Folder</label>
+                                            <input type="text" id="completed-folder" name="COMPLETED_FOLDER" class="form-input" placeholder="/path/to/your/completed_downloads">
+                                        </div>
+                                        <div>
+                                            <label for="local-move-path" class="block text-sm font-medium text-gray-300">Final Movie Folder</label>
+                                            <input type="text" id="local-move-path" name="LOCAL_MOVE_PATH" class="form-input" placeholder="/path/to/your/final_movies">
+                                        </div>
+                                        <div>
+                                            <label for="final-tv-show-folder" class="block text-sm font-medium text-gray-300">Final TV Show Folder</label>
+                                            <input type="text" id="final-tv-show-folder" name="FINAL_TV_SHOW_FOLDER" class="form-input" placeholder="/path/to/your/final_tv_shows">
                                         </div>
                                         <div>
                                             <label for="radarr-root" class="block text-sm font-medium text-gray-300">Radarr Root Folder</label>
                                             <input type="text" id="radarr-root" name="RADARR_ROOT" class="form-input" placeholder="/path/where/radarr/expects/movies">
+                                        </div>
+                                        <div>
+                                            <label for="sonarr-root" class="block text-sm font-medium text-gray-300">Sonarr Root Folder</label>
+                                            <input type="text" id="sonarr-root" name="SONARR_ROOT" class="form-input" placeholder="/path/where/sonarr/expects/tv">
                                         </div>
                                     </div>
                                 </div>
@@ -176,10 +198,22 @@
                                 <!-- Endpoints Section -->
                                 <div>
                                     <h2 class="text-lg font-semibold text-white border-b border-gray-600 pb-2 mb-4">Endpoints</h2>
-                                    <div class="space-y-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                                         <div>
                                             <label for="radarr-url" class="block text-sm font-medium text-gray-300">Radarr URL</label>
-                                            <input type="text" id="radarr-url" name="RADARR_URL" class="form-input" placeholder="http://your-radarr-ip:7878">
+                                            <input type="text" id="radarr-url" name="RADARR_URL" class="form-input" placeholder="http://radarr-ip:7878">
+                                        </div>
+                                        <div>
+                                            <label for="radarr-api-key" class="block text-sm font-medium text-gray-300">Radarr API Key</label>
+                                            <input type="password" id="radarr-api-key" name="RADARR_API_KEY" class="form-input" placeholder="Your Radarr API key">
+                                        </div>
+                                        <div>
+                                            <label for="sonarr-url" class="block text-sm font-medium text-gray-300">Sonarr URL</label>
+                                            <input type="text" id="sonarr-url" name="SONARR_URL" class="form-input" placeholder="http://sonarr-ip:8989">
+                                        </div>
+                                        <div>
+                                            <label for="sonarr-api-key" class="block text-sm font-medium text-gray-300">Sonarr API Key</label>
+                                            <input type="password" id="sonarr-api-key" name="SONARR_API_KEY" class="form-input" placeholder="Your Sonarr API key">
                                         </div>
                                     </div>
                                 </div>
@@ -230,7 +264,7 @@
         // --- Globals for Security & State ---
         let internalApiKey = null;
         let csrfToken = null;
-        const actionButtons = ['btn-start-jd', 'btn-stop-jd', 'btn-run-movies'];
+        const actionButtons = ['btn-start-jd', 'btn-stop-jd', 'btn-start-mo', 'btn-stop-mo', 'btn-start-to', 'btn-stop-to'];
 
         // --- Page Navigation Logic ---
         const pages = document.querySelectorAll('.page');
@@ -281,21 +315,30 @@
                     if (data.movie_organizer.state === 'Running') {
                         movieStatusDot.classList.add('status-running');
                         document.getElementById('movie-status-text').textContent = 'Running';
-                        document.getElementById('btn-run-movies').disabled = true;
+                        document.getElementById('movie-pid').textContent = data.movie_organizer.pid || 'N/A';
+                        const lastScanTime = data.movie_organizer.last_scan ? new Date(data.movie_organizer.last_scan).toLocaleString() : 'N/A';
+                        document.getElementById('movie-last-scan').textContent = lastScanTime;
                     } else {
-                        movieStatusDot.classList.add('status-idle');
-                        document.getElementById('movie-status-text').textContent = 'Idle';
-                        // Only enable if authenticated
-                        if (internalApiKey) document.getElementById('btn-run-movies').disabled = false;
+                        movieStatusDot.classList.add('status-stopped');
+                        document.getElementById('movie-status-text').textContent = 'Stopped';
+                        document.getElementById('movie-pid').textContent = 'N/A';
+                        document.getElementById('movie-last-scan').textContent = 'N/A';
                     }
 
-                    if (data.movie_organizer.last_run && data.movie_organizer.last_run.completed_at) {
-                        document.getElementById('movie-last-run').textContent = new Date(data.movie_organizer.last_run.completed_at).toLocaleString();
-                        const summary = data.movie_organizer.last_run.summary;
-                        document.getElementById('movie-last-run-stats').textContent = summary.error ? `Error: ${summary.error}` : `Processed: ${summary.processed}, Skipped: ${summary.skipped}`;
+                    // TV Show Organizer Status
+                    const tvStatusDot = document.getElementById('tv-status-dot');
+                    tvStatusDot.className = 'status-dot'; // Reset classes
+                    if (data.tv_organizer && data.tv_organizer.state === 'Running') {
+                        tvStatusDot.classList.add('status-running');
+                        document.getElementById('tv-status-text').textContent = 'Running';
+                        document.getElementById('tv-pid').textContent = data.tv_organizer.pid || 'N/A';
+                        const lastScanTime = data.tv_organizer.last_scan ? new Date(data.tv_organizer.last_scan).toLocaleString() : 'N/A';
+                        document.getElementById('tv-last-scan').textContent = lastScanTime;
                     } else {
-                        document.getElementById('movie-last-run').textContent = 'Never';
-                        document.getElementById('movie-last-run-stats').textContent = 'N/A';
+                        tvStatusDot.classList.add('status-stopped');
+                        document.getElementById('tv-status-text').textContent = 'Stopped';
+                        document.getElementById('tv-pid').textContent = 'N/A';
+                        document.getElementById('tv-last-scan').textContent = 'N/A';
                     }
                 })
                 .catch(error => {
@@ -368,7 +411,10 @@
 
         function startJdownloader() { postAction('/start_jdownloader', 'JDownloader watcher started.'); }
         function stopJdownloader() { postAction('/stop_jdownloader', 'JDownloader watcher stopped.'); }
-        function processMovies() { postAction('/process_movies', 'Movie processing initiated.'); }
+        function startMovieOrganizer() { postAction('/start_movie_organizer', 'Movie organizer started.'); }
+        function stopMovieOrganizer() { postAction('/stop_movie_organizer', 'Movie organizer stopped.'); }
+        function startTvOrganizer() { postAction('/start_tv_organizer', 'TV Show organizer started.'); }
+        function stopTvOrganizer() { postAction('/stop_tv_organizer', 'TV Show organizer stopped.'); }
 
         // --- Settings Page Logic ---
         const settingsForm = document.getElementById('settings-form');
