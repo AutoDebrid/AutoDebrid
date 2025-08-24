@@ -93,7 +93,8 @@ def require_api_key(f):
         provided_key = request.headers.get('X-Api-Key')
 
         if not INTERNAL_API_KEY:
-            if request.endpoint in ['get_settings', 'save_settings']:
+            # Allow history access during setup as well
+            if request.endpoint in ['get_settings', 'save_settings', 'get_history']:
                 if provided_key:
                     return f(*args, **kwargs)
                 else:
@@ -116,6 +117,7 @@ tv_organizer_process = None # New process for TV shows
 JD_STATUS_FILE = "jd_status.json"
 MO_STATUS_FILE = "mo_status.json"
 TV_STATUS_FILE = "tv_status.json" # New status file for TV shows
+HISTORY_FILE = "history.json"
 
 
 # --- Notification Helper ---
@@ -133,6 +135,28 @@ def send_notification(title, message):
         logging.info(f"Sent notification: {title}")
     except requests.exceptions.RequestException as e:
         logging.error(f"Failed to send notification: {e}")
+
+# --- History Helper ---
+def add_history_entry(message):
+    """Adds a new entry to the history.json file."""
+    try:
+        history = []
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r') as f:
+                history = json.load(f)
+        
+        entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": message
+        }
+        history.insert(0, entry)
+        
+        # Keep the history trimmed to the last 20 entries
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(history[:20], f, indent=4)
+            
+    except Exception as e:
+        logging.error(f"Failed to write to history file: {e}")
 
 
 # --- JDownloader Logic (Hardened) ---
@@ -174,6 +198,7 @@ def jdownloader_automation_logic():
         try:
             with open(file_path, "w", encoding='utf-8') as f: f.write(content)
             logging.info(f"Created .crawljob for: {safe_base_name}")
+            add_history_entry(f"Sent '{safe_base_name}' to JDownloader.")
             send_notification("Download Sent to JDownloader", torrent_name)
         except IOError as e:
             logging.error(f"Failed to write .crawljob file: {e}")
@@ -323,6 +348,7 @@ def movie_organizer_automation_loop():
                             destination = os.path.join(COMPLETED_FOLDER, item_name)
                             shutil.move(source_path, destination)
                             logging.info(f"Moved stable movie download '{item_name}' to completed folder.")
+                            add_history_entry(f"Moved '{item_name}' to completed folder for movie processing.")
                         except Exception as e:
                             logging.error(f"Failed to move movie '{item_name}' to completed folder: {e}")
             
@@ -336,7 +362,7 @@ def movie_organizer_automation_loop():
 
 def process_completed_movies():
     processed_count, skipped_count = 0, 0
-    error_message = None
+    movies_to_rescan = []
     
     def radarr_api_request(method, endpoint, json_data=None, params=None):
         url = f"{RADARR_URL}/api/v3/{endpoint}"
@@ -354,20 +380,18 @@ def process_completed_movies():
 
     radarr_root_folders = radarr_api_request('GET', 'rootfolder')
     if radarr_root_folders is None:
-        error_message = "Could not communicate with Radarr to get root folders."
-        logging.critical(error_message)
-        return {"processed": 0, "skipped": 0, "error": error_message}
+        logging.critical("Could not communicate with Radarr to get root folders.")
+        return
 
     valid_radarr_paths = [rf['path'] for rf in radarr_root_folders]
     if RADARR_ROOT_PATH not in valid_radarr_paths:
-        error_message = f"Configuration Mismatch! Radarr Root Folder '{RADARR_ROOT_PATH}' is not valid. Valid paths: {valid_radarr_paths}."
-        logging.critical(error_message)
-        return {"processed": 0, "skipped": 0, "error": error_message}
+        logging.critical(f"Configuration Mismatch! Radarr Root Folder '{RADARR_ROOT_PATH}' is not valid. Valid paths: {valid_radarr_paths}.")
+        return
     
     profiles = radarr_api_request('GET', "qualityprofile")
     if not profiles:
         logging.error("Could not fetch quality profiles from Radarr.")
-        return {"processed": 0, "skipped": 0, "error": "Could not fetch Radarr quality profiles."}
+        return
     
     quality_profile_id = next((p['id'] for p in profiles if '1080p' in p['name']), profiles[0]['id'])
 
@@ -401,6 +425,7 @@ def process_completed_movies():
                 logging.warning(f"Movie already has a file in Radarr. Deleting redundant source: '{source_path}'")
                 try:
                     shutil.rmtree(source_path)
+                    add_history_entry(f"Deleted redundant movie source: {item_name}")
                     skipped_count += 1
                     continue
                 except Exception as e:
@@ -437,15 +462,16 @@ def process_completed_movies():
                 set_permissions_recursive(source_path)
                 shutil.move(source_path, destination_path)
                 processed_count += 1
+                movies_to_rescan.append(radarr_movie_object['id'])
+                add_history_entry(f"Processed and moved movie: {clean_folder_name}")
         except Exception as e:
             logging.error(f"Failed to move '{item_name}': {e}")
             skipped_count += 1
     
-    if processed_count > 0:
-        radarr_api_request('POST', "command", json_data={"name": "RescanFolders", "folders": [LOCAL_MOVE_PATH]})
+    if movies_to_rescan:
+        logging.info(f"Triggering Radarr 'RescanMovie' command for {len(movies_to_rescan)} movie(s)...")
+        radarr_api_request('POST', "command", json_data={"name": "RescanMovie", "movieIds": movies_to_rescan})
     
-    return {"processed": processed_count, "skipped": skipped_count, "error": error_message}
-
 
 # --- TV Show Organizer Logic ---
 def tv_show_organizer_automation_loop():
@@ -472,6 +498,7 @@ def tv_show_organizer_automation_loop():
                             destination = os.path.join(COMPLETED_FOLDER, item_name)
                             shutil.move(source_path, destination)
                             logging.info(f"Moved stable TV download '{item_name}' to completed folder.")
+                            add_history_entry(f"Moved '{item_name}' to completed folder for TV processing.")
                         except Exception as e:
                             logging.error(f"Failed to move TV show '{item_name}' to completed folder: {e}")
             
@@ -484,7 +511,7 @@ def tv_show_organizer_automation_loop():
         time.sleep(CHECK_INTERVAL_SECONDS)
 
 def process_completed_tv_shows():
-    processed_count, skipped_count = 0, 0
+    processed_count, series_to_rescan = 0, set()
     
     def sonarr_api_request(method, endpoint, json_data=None, params=None):
         url = f"{SONARR_URL}/api/v3/{endpoint}"
@@ -528,8 +555,9 @@ def process_completed_tv_shows():
         
         clean_pack_path = os.path.join(COMPLETED_FOLDER, clean_series_folder_name)
         try:
-            os.rename(source_pack_path, clean_pack_path)
-            logging.info(f"Renamed '{item_name}' to '{clean_series_folder_name}' inside completed folder.")
+            if source_pack_path != clean_pack_path:
+                os.rename(source_pack_path, clean_pack_path)
+                logging.info(f"Renamed '{item_name}' to '{clean_series_folder_name}' inside completed folder.")
         except OSError as e:
             logging.error(f"Failed to rename '{item_name}': {e}. Skipping pack.")
             continue
@@ -556,13 +584,16 @@ def process_completed_tv_shows():
             set_permissions_recursive(clean_pack_path)
             shutil.move(clean_pack_path, final_destination)
             logging.info(f"Successfully moved '{clean_series_folder_name}' to final TV library.")
+            add_history_entry(f"Processed and moved TV show: {clean_series_folder_name}")
             processed_count += 1
+            series_to_rescan.add(series_info['id'])
         except Exception as e:
             logging.error(f"Failed to move final folder '{clean_series_folder_name}': {e}")
     
-    if processed_count > 0:
-        logging.info(f"Triggering Sonarr 'RescanSeries' command...")
-        sonarr_api_request('POST', "command", json_data={"name": "RescanSeries"})
+    if series_to_rescan:
+        logging.info(f"Triggering Sonarr 'RescanSeries' command for {len(series_to_rescan)} series...")
+        for series_id in series_to_rescan:
+            sonarr_api_request('POST', "command", json_data={"name": "RescanSeries", "seriesId": series_id})
 
 
 # --- Flask API Endpoints ---
@@ -615,6 +646,18 @@ def get_logs():
     except FileNotFoundError: return jsonify(logs="Log file not found."), 404
     except Exception as e: return jsonify(logs=f"Error reading log file: {e}"), 500
 
+@app.route('/api/history')
+@require_api_key
+def get_history():
+    """Fetches the recent activity history."""
+    if not os.path.exists(HISTORY_FILE):
+        return jsonify([])
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            return jsonify(json.load(f))
+    except (IOError, json.JSONDecodeError):
+        return jsonify([])
+
 @app.route('/start_jdownloader', methods=['POST'])
 @require_api_key
 def start_jdownloader():
@@ -624,6 +667,7 @@ def start_jdownloader():
     jdownloader_process = subprocess.Popen([sys.executable, 'app.py', 'jdownloader'])
     msg = f"JDownloader watcher started with PID: {jdownloader_process.pid}"
     logging.info(msg)
+    add_history_entry("JDownloader watcher started.")
     send_notification("Service Started", "JDownloader Watcher is now running.")
     return jsonify(status=msg)
 
@@ -638,6 +682,7 @@ def stop_jdownloader():
     jdownloader_process = None
     msg = f"JDownloader watcher (PID: {pid}) stopped."
     logging.info(msg)
+    add_history_entry("JDownloader watcher stopped.")
     send_notification("Service Stopped", "JDownloader Watcher has been stopped.")
     return jsonify(status=msg)
 
@@ -650,6 +695,7 @@ def start_movie_organizer():
     movie_organizer_process = subprocess.Popen([sys.executable, 'app.py', 'movie_organizer'])
     msg = f"Movie organizer started with PID: {movie_organizer_process.pid}"
     logging.info(msg)
+    add_history_entry("Movie organizer started.")
     send_notification("Service Started", "Movie Organizer is now running.")
     return jsonify(status=msg)
 
@@ -664,6 +710,7 @@ def stop_movie_organizer():
     movie_organizer_process = None
     msg = f"Movie organizer (PID: {pid}) stopped."
     logging.info(msg)
+    add_history_entry("Movie organizer stopped.")
     send_notification("Service Stopped", "Movie Organizer has been stopped.")
     return jsonify(status=msg)
 
@@ -676,6 +723,7 @@ def start_tv_organizer():
     tv_organizer_process = subprocess.Popen([sys.executable, 'app.py', 'tv_organizer'])
     msg = f"TV organizer started with PID: {tv_organizer_process.pid}"
     logging.info(msg)
+    add_history_entry("TV organizer started.")
     send_notification("Service Started", "TV Organizer is now running.")
     return jsonify(status=msg)
 
@@ -690,6 +738,7 @@ def stop_tv_organizer():
     tv_organizer_process = None
     msg = f"TV organizer (PID: {pid}) stopped."
     logging.info(msg)
+    add_history_entry("TV organizer stopped.")
     send_notification("Service Stopped", "TV Organizer has been stopped.")
     return jsonify(status=msg)
 
