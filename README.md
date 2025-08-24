@@ -2,7 +2,8 @@
 
 A web-based dashboard to automate your media workflow, bridging the gap between Real-Debrid, JDownloader, Radarr, and Sonarr. This application monitors your services, processes completed downloads, and organizes your media library automatically.
 
-[![Dashboard Screenshot](https://i.postimg.cc/6pqQr90S/dashboard.png)](https://postimg.cc/yDqBBC2X)
+[![Dashboard Screenshot](https://i.postimg.cc/T2W9c3Tt/newhomepage-1.png)](https://postimg.cc/23rhkmbW)
+[![Log Page](https://i.postimg.cc/vHrtp2g9/newlogpage-2.png)](https://postimg.cc/dL0CCB9t)
 
 ---
 
