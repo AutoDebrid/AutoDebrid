@@ -18,7 +18,16 @@
         .status-running { background-color: #22c55e; box-shadow-color: #22c55e; }
         .status-stopped { background-color: #ef4444; box-shadow-color: #ef4444; }
         .status-idle { background-color: #eab308; box-shadow-color: #eab308; }
-        .log-box { background-color: #000; color: #a5f3fc; font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; border: 1px solid #374151; }
+        .log-box { 
+            background-color: #000; 
+            color: #a5f3fc; 
+            font-family: 'Courier New', Courier, monospace; 
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
+            height: 70vh; /* Increased height for dedicated page */
+            overflow-y: auto; 
+            border: 1px solid #374151; 
+        }
         .btn { transition: all 0.2s ease-in-out; }
         .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .btn:disabled { background-color: #4b5563; cursor: not-allowed; }
@@ -59,6 +68,12 @@
             border-color: #4f46e5;
             box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
         }
+        #history-list div {
+            border-bottom: 1px solid #374151;
+        }
+        #history-list div:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 <body class="p-4 sm:p-6 lg:p-8">
@@ -71,6 +86,7 @@
             <nav class="flex space-x-2 bg-gray-800 p-2 rounded-lg">
                 <button onclick="showPage('dashboard')" class="nav-link text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" data-page="dashboard">Dashboard</button>
                 <button onclick="showPage('settings')" class="nav-link text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" data-page="settings">Settings</button>
+                <button onclick="showPage('logs')" class="nav-link text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" data-page="logs">Logs</button>
             </nav>
         </header>
 
@@ -118,9 +134,13 @@
                     </div>
                 </div>
 
+                <!-- Recent Activity Viewer -->
                 <div class="card p-6 rounded-lg shadow-lg">
-                    <h2 class="text-xl font-semibold text-white mb-4">Application Logs</h2>
-                    <div id="log-output" class="log-box p-4 rounded-md">Authenticating... Please enter your API Key.</div>
+                    <h2 class="text-xl font-semibold text-white mb-4">Recent Activity</h2>
+                    <div id="history-list" class="space-y-2">
+                        <!-- History items will be injected here by JavaScript -->
+                        <p class="text-gray-400">Loading recent activity...</p>
+                    </div>
                 </div>
             </div>
 
@@ -253,6 +273,14 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Logs Page -->
+            <div id="logs-page" class="page">
+                <div class="card p-6 rounded-lg shadow-lg">
+                    <h2 class="text-xl font-semibold text-white mb-4">Application Logs</h2>
+                    <div id="log-output" class="log-box p-4 rounded-md">Authenticating... Please enter your API Key.</div>
+                </div>
+            </div>
         </main>
 
         <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white py-2 px-4 rounded-lg shadow-lg transition-opacity duration-300 opacity-0">
@@ -362,6 +390,41 @@
                     console.error('Error fetching logs:', error);
                     document.getElementById('log-output').textContent = 'Error loading logs.';
                 });
+        }
+
+        function updateHistory() {
+            if (!internalApiKey) return;
+            const historyList = document.getElementById('history-list');
+            
+            fetch('/api/history', {
+                headers: { 'X-Api-Key': internalApiKey, 'X-CSRFToken': csrfToken }
+            })
+            .then(response => response.json())
+            .then(data => {
+                historyList.innerHTML = ''; // Clear current list
+                if (data.length === 0) {
+                    historyList.innerHTML = '<p class="text-gray-400">No recent activity to display.</p>';
+                    return;
+                }
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'p-3 flex justify-between items-center';
+                    const message = document.createElement('p');
+                    message.className = 'text-gray-300';
+                    message.textContent = item.message;
+                    const timestamp = document.createElement('p');
+                    timestamp.className = 'text-xs text-gray-500 font-mono';
+                    timestamp.textContent = new Date(item.timestamp).toLocaleString();
+                    
+                    div.appendChild(message);
+                    div.appendChild(timestamp);
+                    historyList.appendChild(div);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching history:', error);
+                historyList.innerHTML = '<p class="text-red-400">Error loading activity.</p>';
+            });
         }
         
         function showToast(message) {
@@ -493,12 +556,13 @@
             }
 
             if (internalApiKey) {
-                document.getElementById('log-output').textContent = 'Authenticated. Loading logs...';
                 actionButtons.forEach(id => document.getElementById(id).disabled = false);
                 updateStatus();
                 updateLogs();
+                updateHistory(); // Initial call
                 setInterval(updateStatus, 5000);
                 setInterval(updateLogs, 10000);
+                setInterval(updateHistory, 15000); // Refresh history every 15 seconds
             } else {
                  document.getElementById('log-output').textContent = 'Authentication cancelled. Refresh the page to try again.';
             }
